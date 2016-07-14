@@ -1,0 +1,29 @@
+version: '2'
+
+services:
+    es-master:
+        image: elasticsearch:2  
+        restart: always
+        command: elasticsearch --discovery.zen.ping.unicast.hosts=es_master --node.master=true --node.data=false --cluster.name production
+        container_name: es_master
+        networks:
+        - elasticsearch-network
+
+    es-data:
+        image: elasticsearch:2
+        command: elasticsearch --discovery.zen.ping.unicast.hosts=es_master --node.master=false --node.data=true --cluster.name production
+        restart: always
+        networks:
+        - elasticsearch-network
+
+    es-client:
+        image: elasticsearch:2
+        port: 9200:9200
+        command: elasticsearch --discovery.zen.ping.unicast.hosts=es_master --node.master=false --node.data=false --cluster.name production
+        restart: always
+        networks:
+        - elasticsearch-network
+
+networks:
+  elasticsearch-network:
+    driver: overlay
