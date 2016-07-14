@@ -19,7 +19,7 @@ services:
     es-client:
         image: elasticsearch:2
         ports: 
-        - "9200:9200"
+         -"9205:9200"
         command: elasticsearch --discovery.zen.ping.unicast.hosts=es_master --node.master=false --node.data=false --cluster.name production
         restart: always
         networks:
