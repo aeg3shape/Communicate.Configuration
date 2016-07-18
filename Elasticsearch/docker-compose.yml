@@ -2,15 +2,15 @@ version: '2'
 
 services:
     es-master:
-        image: elasticsearch:2  
+        image: elasticsearch:2
         restart: always
-        command: elasticsearch --discovery.zen.ping.unicast.hosts=es-master --node.master=true --node.data=false --cluster.name production --node.name es-master --discovery.zen.minimum_master_nodes=3
+        command: elasticsearch --discovery.zen.ping.unicast.hosts=es-master --node.master=true --node.data=false --cluster.name=production --node.name=es-master --discovery.zen.minimum_master_nodes=3 --publish_host="_non_loopback:ipv4_"
         networks:
         - elasticsearch-network
 
     es-data:
         image: elasticsearch:2
-        command: elasticsearch --discovery.zen.ping.unicast.hosts=es-master --node.master=false --node.data=true --cluster.name production --node.name es-data
+        command: elasticsearch --discovery.zen.ping.unicast.hosts=es-master --node.master=false --node.data=true --cluster.name=production --node.name=es-data
         restart: always
         depends_on:
             - es-master
@@ -21,7 +21,7 @@ services:
         image: elasticsearch:2
         ports: 
          - "9200:9200"
-        command: elasticsearch --discovery.zen.ping.unicast.hosts=es-master --node.master=false --node.data=false --cluster.name production --node.name es-client
+        command: elasticsearch --discovery.zen.ping.unicast.hosts=es-master --node.master=false --node.data=false --cluster.name=production --node.name=es-client
         restart: always
         depends_on:
             - es-master
