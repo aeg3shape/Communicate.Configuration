@@ -8,9 +8,7 @@ services:
         networks:
         - elasticsearch-network
         environment:                                                                                                                                                                                                                                                                                        
-        - reschedule=on-node-failure                                                              
-        labels:
-        com.docker.swarm.reschedule-policies: "[\"on-node-failure\"]"
+        - reschedule=on-node-failure
 
     es-data:
         image: elasticsearch:2
