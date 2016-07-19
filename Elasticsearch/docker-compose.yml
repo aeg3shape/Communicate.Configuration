@@ -4,7 +4,7 @@ services:
     es-master:
         image: elasticsearch:2
         restart: always
-        command: elasticsearch --discovery.zen.ping.unicast.hosts=es-master --node.master=true --node.data=false --cluster.name=production --node.name=es-master --discovery.zen.minimum_master_nodes=3 --publish_host="_non_loopback:ipv4_" --network.bind_host=0
+        command: elasticsearch --discovery.zen.ping.multicast.enabled=false --discovery.zen.ping.unicast.hosts=es-master --node.master=true --node.data=false --cluster.name=production --node.name=es-master --discovery.zen.minimum_master_nodes=3 --network.bind_host=0.0.0.0
         networks:
         - elasticsearch-network
 
