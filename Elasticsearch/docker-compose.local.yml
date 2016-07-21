@@ -2,4 +2,3 @@ version: '2'
 
 networks:
     elasticsearch-network:
-        driver: bridge
