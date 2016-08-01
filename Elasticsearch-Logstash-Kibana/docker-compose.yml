@@ -34,7 +34,7 @@ services:
         image: kibana
         ports: 
             - "5601:5601"
-        command: kibana --elasticsearch.url=es-client
+        command: kibana --elasticsearch.url=http://es-client:9200
         restart: always
         depends_on: 
             - es-client
