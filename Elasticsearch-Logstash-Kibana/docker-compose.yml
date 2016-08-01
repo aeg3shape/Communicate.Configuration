@@ -42,13 +42,13 @@ services:
         - elk-network
 
     logstash:
-        image: logstash -f configuration/logstash.conf
+        image: logstash
         #image: logstash -f /config-dir/logstash.conf
         #volumes: 
         #- '"$PWD":/config-dir'
         ports: 
             - "5044:5044"
-        command: logstash 
+        command: logstash -f configuration/logstash.conf
         restart: always
         depends_on: 
             - es-client
