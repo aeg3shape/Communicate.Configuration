@@ -34,7 +34,7 @@ services:
         image: kibana
         ports: 
             - "5601:5601"
-        command: kibana 
+        command: kibana --elasticsearch.url=es-client
         restart: always
         depends_on: 
             - es-client
@@ -43,9 +43,6 @@ services:
 
     logstash:
         image: logstash
-        #image: logstash -f /config-dir/logstash.conf
-        #volumes: 
-        #- '"$PWD":/config-dir'
         ports: 
             - "5044:5044"
         command: logstash -f configuration/logstash.conf
