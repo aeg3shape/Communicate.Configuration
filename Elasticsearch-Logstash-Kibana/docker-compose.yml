@@ -1,0 +1,62 @@
+version: '2'
+
+services:
+    es-master:
+        image: elasticsearch:2
+        restart: always
+        command: elasticsearch --discovery.zen.ping.multicast.enabled=false --discovery.zen.ping.unicast.hosts=es-master --discovery.zen.minimum_master_nodes=3 --node.master=true --node.data=false --cluster.name=metrics --node.name=es-master --network.bind_host=0.0.0.0
+        networks:
+        - elk-network
+        environment:                                                                                                                                                                                                                                                                                        
+        - reschedule=on-node-failure
+        labels:
+        - 'com.docker.swarm.reschedule-policies=["on-node-failure"]'
+
+    es-data:
+        image: elasticsearch:2
+        command: elasticsearch --discovery.zen.ping.multicast.enabled=false --discovery.zen.ping.unicast.hosts=es-master --discovery.zen.minimum_master_nodes=3 --node.master=false --node.data=true --cluster.name=metrics --node.name=es-data
+        restart: always
+        depends_on:
+            - es-master
+        networks:
+        - elk-network
+
+    es-client:
+        image: elasticsearch:2
+        command: elasticsearch --discovery.zen.ping.multicast.enabled=false --discovery.zen.ping.unicast.hosts=es-master --discovery.zen.minimum_master_nodes=3 --node.master=false --node.data=false --cluster.name=metrics --node.name=es-client
+        restart: always
+        depends_on:
+            - es-master
+        networks:
+        - elk-network
+
+     kibana:
+        image: kibana
+        ports: 
+         - "5601:5601"
+        command: kibana 
+        restart: always
+        depends_on: 
+            - es-client
+        networks: 
+        - elk-network
+
+    logstash:
+    image: logstash -f configuration/logstash.conf
+        #image: logstash -f /config-dir/logstash.conf
+        #volumes: 
+        #- '"$PWD":/config-dir'
+        ports: 
+         - "5044:5044"
+        command: logstash 
+        restart: always
+        depends_on: 
+            - es-client
+        networks: 
+        - elk-network
+
+        
+
+networks:
+  elk-network:
+    driver: overlay
