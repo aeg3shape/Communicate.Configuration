@@ -45,7 +45,7 @@ services:
         image: logstash
         ports: 
             - "5044:5044"
-        command: logstash
+        command: logstash -e 'input { stdin { } } output { stdout {} }'
         restart: always
         depends_on: 
             - es-client
