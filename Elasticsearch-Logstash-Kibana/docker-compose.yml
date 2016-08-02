@@ -45,6 +45,8 @@ services:
         image: logstash
         ports: 
             - "5044:5044"
+        volumes:
+         - ./configuration:/tmp/configuration
         command: logstash -e 'input { stdin { } } output { stdout {} }'
         restart: always
         depends_on: 
