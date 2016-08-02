@@ -47,7 +47,7 @@ services:
             - "5044:5044"
         volumes:
             - ./configuration:/etc
-        command: logstash -f /etc/logstash.conf
+        command: logstash -e 'input { stdin { } } output { stdout {} }'
         restart: always
         depends_on: 
             - es-client
