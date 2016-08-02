@@ -45,9 +45,7 @@ services:
         image: logstash
         ports: 
             - "5044:5044"
-        command: logstash -f /etc/logstash.conf
-        volumes:
-            - ./configuration:/etc
+        command: logstash
         restart: always
         depends_on: 
             - es-client
