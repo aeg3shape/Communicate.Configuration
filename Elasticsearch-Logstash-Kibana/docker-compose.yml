@@ -45,9 +45,7 @@ services:
         image: logstash
         ports: 
             - "5044:5044"
-        volumes:
-         - "$PWD":/config-dir
-        command: logstash -f /config-dir/logstash.conf
+        command: logstash -v "$PWD":/config-dir -f /config-dir/logstash.conf
         restart: always
         depends_on: 
             - es-client
