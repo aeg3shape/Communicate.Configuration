@@ -46,7 +46,6 @@ services:
         ports: 
             - "5044:5044"
         command: logstash -v "$PWD"/configuration:/config-dir -f /config-dir/logstash.conf
-        restart: always
         depends_on: 
             - es-client
         networks: 
