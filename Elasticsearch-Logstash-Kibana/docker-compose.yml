@@ -45,7 +45,7 @@ services:
         image: logstash
         ports: 
             - "5044:5044"
-        command: logstash -v "$PWD"/configuration:/config-dir -f /config-dir/logstash.conf
+        command: logstash -p 5044:5044 -v "$PWD"/configuration:/config-dir -f /config-dir/logstash.conf
         depends_on: 
             - es-client
         networks: 
