@@ -44,7 +44,7 @@ services:
     logstash:
         image: logstash
         ports: 
-            - "5044:5044"
+            - "5000:5000"
         command: logstash -v "$PWD"/configuration:/config-dir -f /config-dir/logstash.conf
         depends_on: 
             - es-client
