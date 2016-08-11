@@ -47,7 +47,7 @@ services:
             - "5044:5044"
         volumes: 
          - ./configuration:/config-dir/
-        command: logstash -e 'input { beats { port => 5044 }} filter { if [message] =~ /^#/ { drop{} } grok { match => { "message" => "%{DATESTAMP_EVENTLOG:eventtime} \w+ \w+ %{IPV4:ip} (?<httpmethod>GET|POST|PUT) %{URIPATH:url} .* (?<httpstatus>[0-9]{3}) \d+ \d+ \d+ \d+ %{INT:timetaken:int}" } match => { "message" => "%{TIMESTAMP_ISO8601:timestamp}[\t]%{UUID:CaseId}[\t]%{WORD:method}[\t]%{INT:timetaken:int}" } } date { match => ["eventtime", "YYYY-MM-dd HH:mm:ss"] } } output { elasticsearch { hosts => ["es-client"] index => "%{type}-%{+YYYY.MM.dd}" } }'
+        command: logstash -e 'input { beats { port => 5044 }} filter { if [message] =~ /^#/ { drop{} } grok { match => { "message" => "(?<timestampIIS>%{YEAR}-%{MONTHNUM}-%{MONTHDAY} %{HOUR}:%{MINUTE}:%{SECOND}) \w+ \w+ %{IPV4:ip} (?<httpmethod>GET|POST|PUT) %{URIPATH:url} .* (?<httpstatus>[0-9]{3}) \d+ \d+ \d+ \d+ %{INT:timetaken:int}" } match => { "message" => "%{TIMESTAMP_ISO8601:timestamp}[\t]%{UUID:CaseId}[\t]%{WORD:method}[\t]%{INT:timetaken:int}" } } date { match => ["timestampIIS", "YYYY-MM-dd HH:mm:ss"] } } output { elasticsearch { hosts => ["es-client"] index => "%{type}-%{+YYYY.MM.dd}" } }'
         depends_on: 
             - es-client
         networks: 
