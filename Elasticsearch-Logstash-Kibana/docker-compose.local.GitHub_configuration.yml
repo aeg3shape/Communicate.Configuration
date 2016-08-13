@@ -1,0 +1,20 @@
+version: '2'
+
+services:
+    es-client:
+        ports: 
+            - "9200:9200"
+
+    logstash:
+        image: pblittle/docker-logstash
+        ports:          
+            - "5044:5044"
+        command: logstash -e LOGSTASH_CONFIG_URL=https://raw.githubusercontent.com/3shapeAS/Communicate.Configuration/master/Elasticsearch-Logstash-Kibana/configuration/logstash.conf
+        depends_on: 
+            - es-client
+        networks: 
+        - elk-network
+      
+
+networks:
+    elk-network:

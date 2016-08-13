@@ -1,0 +1,23 @@
+version: '2'
+
+services:
+    es-client:
+        ports: 
+            - "9200:9200"
+    logstash:
+        volumes:
+            - ./config:/config/
+        command: logstash -f ./config/logstash.conf
+    
+    filebeat:
+        image: olinicola/filebeat:1.2.3
+        volumes:
+            - "./config/filebeat.yml:/etc/filebeat/filebeat.yml"
+        restart: always
+        depends_on: 
+            - logstash
+        networks: 
+        - elk-network
+
+networks:
+    elk-network:

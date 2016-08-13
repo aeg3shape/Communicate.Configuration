@@ -1,0 +1,9 @@
+version: '2'
+
+services:
+    es-client:
+        ports: 
+            - "9200:9200"
+
+networks:
+    elk-network:
