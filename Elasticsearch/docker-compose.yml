@@ -20,6 +20,8 @@ services:
             - es-master
         networks:
         - elasticsearch-network
+        environment:
+        - ES_HEAP_SIZE=4g
 
     es-client:
         image: elasticsearch:2
