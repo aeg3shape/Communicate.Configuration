@@ -1,0 +1,606 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "sshPublicKey": {
+            "type": "SecureString",
+            "metadata": {
+                "description": "SSH public key for the Virtual Machines."
+            }
+        },
+        "nodeCount": {
+            "defaultValue": 4,
+            "type": "Int",
+            "metadata": {
+                "description": "Number of Swarm worker nodes in the cluster."
+            }
+        },
+        "instanceSize": {
+            "type": "string",
+            "allowedValues": [
+                "Standard_DS3_V2",
+                "Standard_DS2_V2",
+                "Standard_D1_V2",
+                "Standard_A2"
+            ],
+            "metadata": {
+                "description": "The instance size of the worker nodes in the cluster."
+            }
+        },
+        "storageType": {
+        "type": "string",
+        "allowedValues": [
+            "Premium_LRS",
+            "Standard_LRS"
+        ],
+        "metadata": {
+            "description": "Type of storage to use for worker nodes in the cluster: Premium (SSD) or Standard (HDD)"
+            }
+        }
+    },
+    "variables": {
+        "masterCount": 3,
+        "adminUsername": "azureuser",
+        "vmNameMaster": "swarm-master-",
+        "vmNameNode": "swarm-node-",
+        "vmSizeMaster": "Standard_A0",
+        "vmSizeNode": "[parameters('instanceSize')]",
+        "availabilitySetMasters": "swarm-masters-set",
+        "availabilitySetNodes": "swarm-nodes-set",
+        "osImagePublisher": "CoreOS",
+        "osImageOffer": "CoreOS",
+        "osImageSKU": "Stable",
+        "managementPublicIPAddrName": "swarm-lb-masters-ip",
+        "nodesPublicIPAddrName": "swarm-lb-nodes-ip",
+        "virtualNetworkName": "swarm-vnet",
+        "subnetNameMasters": "subnet-masters",
+        "subnetNameNodes": "subnet-nodes",
+        "addressPrefixMasters": "10.0.0.0/16",
+        "addressPrefixNodes": "192.168.0.0/16",
+        "subnetPrefixMasters": "10.0.0.0/24",
+        "subnetPrefixNodes": "192.168.0.0/24",
+        "subnetRefMaster": "[concat(resourceId('Microsoft.Network/virtualNetworks',variables('virtualNetworkName')),'/subnets/',variables('subnetNameMasters'))]",
+        "subnetRefNodes": "[concat(resourceId('Microsoft.Network/virtualNetworks',variables('virtualNetworkName')),'/subnets/',variables('subnetNameNodes'))]",
+        "mastersNsgName": "swarm-masters-firewall",
+        "nodesNsgName": "swarm-nodes-firewall",
+        "mastersNsgID": "[resourceId('Microsoft.Network/networkSecurityGroups',variables('mastersNsgName'))]",
+        "nodesNsgID": "[resourceId('Microsoft.Network/networkSecurityGroups',variables('nodesNsgName'))]",
+        "newStorageAccountName": "[uniqueString(resourceGroup().id, deployment().name)]",
+        "newMasterStorageAccountName": "[uniqueString(resourceGroup().id, concat(deployment().name), '-master')]",
+        "clusterFqdn": "[concat('swarm-',uniqueString(resourceGroup().id, deployment().name))]",
+        "storageAccountType": "[parameters('storageType')]",
+        "vhdBlobContainer": "vhds",
+        "mastersLbName": "swarm-lb-masters",
+        "mastersLbID": "[resourceId('Microsoft.Network/loadBalancers',variables('mastersLbName'))]",
+        "mastersLbIPConfigName": "MastersLBFrontEnd",
+        "mastersLbIPConfigID": "[concat(variables('mastersLbID'),'/frontendIPConfigurations/', variables('mastersLbIPConfigName'))]",
+        "mastersLbBackendPoolName": "swarm-masters-pool",
+        "nodesLbName": "swarm-lb-nodes",
+        "nodesLbID": "[resourceId('Microsoft.Network/loadBalancers',variables('nodesLbName'))]",
+        "nodesLbBackendPoolName": "swarm-nodes-pool",
+        "sshKeyPath": "[concat('/home/', variables('adminUsername'), '/.ssh/authorized_keys')]",
+        "consulServerArgs": [
+            "-advertise 10.0.0.4 -bootstrap-expect 3 -retry-join 10.0.0.5 -retry-join 10.0.0.6",
+            "-advertise 10.0.0.5 -retry-join 10.0.0.4 -retry-join 10.0.0.6",
+            "-advertise 10.0.0.6 -retry-join 10.0.0.4 -retry-join 10.0.0.5"
+        ]
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "name": "[variables('newStorageAccountName')]",
+            "apiVersion": "2015-06-15",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "accountType": "[variables('storageAccountType')]"
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "name": "[variables('newMasterStorageAccountName')]",
+            "apiVersion": "2015-06-15",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "accountType": "Standard_LRS"
+            }
+        },
+        {
+            "type": "Microsoft.Compute/availabilitySets",
+            "name": "[variables('availabilitySetMasters')]",
+            "apiVersion": "2015-06-15",
+            "location": "[resourceGroup().location]",
+            "properties": {}
+        },
+        {
+            "type": "Microsoft.Compute/availabilitySets",
+            "name": "[variables('availabilitySetNodes')]",
+            "apiVersion": "2015-06-15",
+            "location": "[resourceGroup().location]",
+            "properties": {}
+        },
+        {
+            "type": "Microsoft.Network/publicIPAddresses",
+            "name": "[variables('managementPublicIPAddrName')]",
+            "apiVersion": "2015-06-15",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "publicIPAllocationMethod": "Dynamic",
+                "dnsSettings": {
+                    "domainNameLabel": "[concat(variables('clusterFqdn'), '-manage')]"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Network/publicIPAddresses",
+            "name": "[variables('nodesPublicIPAddrName')]",
+            "apiVersion": "2015-06-15",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "publicIPAllocationMethod": "Dynamic",
+                "dnsSettings": {
+                    "domainNameLabel": "[variables('clusterFqdn')]"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks",
+            "name": "[variables('virtualNetworkName')]",
+            "apiVersion": "2015-06-15",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "[variables('addressPrefixMasters')]",
+                        "[variables('addressPrefixNodes')]"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "[variables('subnetNameMasters')]",
+                        "properties": {
+                            "addressPrefix": "[variables('subnetPrefixMasters')]",
+                            "networkSecurityGroup": {
+                                "id": "[variables('mastersNsgID')]"
+                            }
+                        }
+                    },
+                    {
+                        "name": "[variables('subnetNameNodes')]",
+                        "properties": {
+                            "addressPrefix": "[variables('subnetPrefixNodes')]",
+                            "networkSecurityGroup": {
+                                "id": "[variables('nodesNsgID')]"
+                            }
+                        }
+                    }
+                ]
+            },
+            "dependsOn": [
+                "[variables('mastersNsgID')]",
+                "[variables('nodesNsgID')]"
+            ]
+        },
+        {
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "name": "[variables('mastersNsgName')]",
+            "apiVersion": "2015-06-15",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "securityRules": [
+                    {
+                        "name": "ssh",
+                        "properties": {
+                            "description": "",
+                            "protocol": "Tcp",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "22",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 1000,
+                            "direction": "Inbound"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "name": "[variables('nodesNsgName')]",
+            "apiVersion": "2015-06-15",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "securityRules": [
+                    {
+                        "name": "AllowAny",
+                        "properties": {
+                            "description": "Swarm node ports need to be configured on the load balancer to be reachable",
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "*",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 1000,
+                            "direction": "Inbound"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkInterfaces",
+            "name": "[concat(variables('vmNameMaster'), copyIndex(), '-nic')]",
+            "apiVersion": "2015-06-15",
+            "location": "[resourceGroup().location]",
+            "copy": {
+                "name": "nicLoopMaster",
+                "count": "[variables('masterCount')]"
+            },
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipConfigMaster",
+                        "properties": {
+                            "privateIPAllocationMethod": "Static",
+                            "privateIPAddress": "[concat('10.0.0.', copyIndex(4))]",
+                            "subnet": {
+                                "id": "[variables('subnetRefMaster')]"
+                            },
+                            "loadBalancerBackendAddressPools": [
+                                {
+                                    "id": "[concat(variables('mastersLbID'), '/backendAddressPools/', variables('mastersLbBackendPoolName'))]"
+                                }
+                            ],
+                            "loadBalancerInboundNatRules": [
+                                {
+                                    "id": "[concat(variables('mastersLbID'),'/inboundNatRules/SSH-',variables('vmNameMaster'),copyindex())]"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "dependsOn": [
+                "[concat('Microsoft.Network/loadBalancers/', variables('mastersLbName'))]",
+                "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]",
+                "[concat('Microsoft.Network/loadBalancers/', variables('mastersLbName'), '/inboundNatRules/',  'SSH-', variables('vmNameMaster'), copyIndex())]"
+            ]
+        },
+        {
+            "type": "Microsoft.Network/loadBalancers",
+            "name": "[variables('mastersLbName')]",
+            "apiVersion": "2015-06-15",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "frontendIPConfigurations": [
+                    {
+                        "name": "[variables('mastersLbIPConfigName')]",
+                        "properties": {
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses',variables('managementPublicIPAddrName'))]"
+                            }
+                        }
+                    }
+                ],
+                "backendAddressPools": [
+                    {
+                        "name": "[variables('mastersLbBackendPoolName')]"
+                    }
+                ]
+            },
+            "dependsOn": [
+                "[concat('Microsoft.Network/publicIPAddresses/', variables('managementPublicIPAddrName'))]"
+            ]
+        },
+        {
+            "type": "Microsoft.Network/loadBalancers/inboundNatRules",
+            "name": "[concat(variables('mastersLbName'), '/', 'SSH-', variables('vmNameMaster'), copyIndex())]",
+            "apiVersion": "2015-06-15",
+            "location": "[resourceGroup().location]",
+            "copy": {
+                "name": "lbNatLoopMaster",
+                "count": "[variables('masterCount')]"
+            },
+            "properties": {
+                "frontendIPConfiguration": {
+                    "id": "[variables('mastersLbIPConfigID')]"
+                },
+                "protocol": "tcp",
+                "frontendPort": "[copyIndex(2200)]",
+                "backendPort": 22,
+                "enableFloatingIP": false
+            },
+            "dependsOn": [
+                "[concat('Microsoft.Network/loadBalancers/', variables('mastersLbName'))]"
+            ]
+        },
+        {
+            "type": "Microsoft.Network/loadBalancers",
+            "name": "[variables('nodesLbName')]",
+            "apiVersion": "2015-06-15",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "frontendIPConfigurations": [
+                    {
+                        "name": "LoadBalancerFrontEnd",
+                        "properties": {
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses',variables('nodesPublicIPAddrName'))]"
+                            }
+                        }
+                    }
+                ],
+                "backendAddressPools": [
+                    {
+                        "name": "[variables('nodesLbBackendPoolName')]"
+                    }
+                ]
+            },
+            "dependsOn": [
+                "[concat('Microsoft.Network/publicIPAddresses/', variables('nodesPublicIPAddrName'))]"
+            ]
+        },
+        {
+            "type": "Microsoft.Network/networkInterfaces",
+            "name": "[concat(variables('vmNameNode'),copyIndex(), '-nic')]",
+            "apiVersion": "2015-06-15",
+            "location": "[resourceGroup().location]",
+            "copy": {
+                "name": "nicLoopNode",
+                "count": "[parameters('nodeCount')]"
+            },
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipConfigNode",
+                        "properties": {
+                            "privateIPAllocationMethod": "Dynamic",
+                            "subnet": {
+                                "id": "[variables('subnetRefNodes')]"
+                            },
+                            "loadBalancerBackendAddressPools": [
+                                {
+                                    "id": "[concat(variables('nodesLbID'), '/backendAddressPools/', variables('nodesLbBackendPoolName'))]"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "dependsOn": [
+                "[concat('Microsoft.Network/loadBalancers/', variables('nodesLbName'))]",
+                "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]"
+            ]
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines",
+            "name": "[concat(variables('vmNameMaster'), copyIndex())]",
+            "apiVersion": "2015-06-15",
+            "location": "[resourceGroup().location]",
+            "copy": {
+                "name": "vmLoopMaster",
+                "count": "[variables('masterCount')]"
+            },
+            "properties": {
+                "availabilitySet": {
+                    "id": "[resourceId('Microsoft.Compute/availabilitySets',variables('availabilitySetMasters'))]"
+                },
+                "hardwareProfile": {
+                    "vmSize": "[variables('vmSizeMaster')]"
+                },
+                "osProfile": {
+                    "computerName": "[concat(variables('vmNameMaster'), copyIndex())]",
+                    "adminUsername": "[variables('adminUsername')]",
+                    "linuxConfiguration": {
+                        "disablePasswordAuthentication": "true",
+                        "ssh": {
+                            "publicKeys": [
+                                {
+                                    "path": "[variables('sshKeyPath')]",
+                                    "keyData": "[parameters('sshPublicKey')]"
+                                }
+                            ]
+                        }
+                    }
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "publisher": "[variables('osImagePublisher')]",
+                        "offer": "[variables('osImageOffer')]",
+                        "sku": "[variables('osImageSKU')]",
+                        "version": "latest"
+                    },
+                    "osDisk": {
+                        "name": "[concat(variables('vmNameMaster'), copyIndex(),'-osdisk')]",
+                        "vhd": {
+                            "uri": "[concat('http://', variables('newMasterStorageAccountName'), '.blob.core.windows.net/', variables('vhdBlobContainer'), '/master-', copyIndex(), '-osdisk.vhd')]"
+                        },
+                        "caching": "ReadWrite",
+                        "createOption": "FromImage"
+                    }
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces',concat(variables('vmNameMaster'), copyIndex(), '-nic'))]"
+                        }
+                    ]
+                }
+            },
+            "dependsOn": [
+                "[concat('Microsoft.Storage/storageAccounts/', variables('newMasterStorageAccountName'))]",
+                "[concat('Microsoft.Network/networkInterfaces/', variables('vmNameMaster'), copyIndex(), '-nic')]",
+                "[concat('Microsoft.Compute/availabilitySets/', variables('availabilitySetMasters'))]"
+            ]
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines",
+            "name": "[concat(variables('vmNameNode'), copyIndex())]",
+            "apiVersion": "2015-06-15",
+            "location": "[resourceGroup().location]",
+            "copy": {
+                "name": "vmLoopNode",
+                "count": "[parameters('nodeCount')]"
+            },
+            "properties": {
+                "availabilitySet": {
+                    "id": "[resourceId('Microsoft.Compute/availabilitySets',variables('availabilitySetNodes'))]"
+                },
+                "hardwareProfile": {
+                    "vmSize": "[variables('vmSizeNode')]"
+                },
+                "osProfile": {
+                    "computerName": "[concat(variables('vmNameNode'), copyIndex())]",
+                    "adminUsername": "[variables('adminUsername')]",
+                    "linuxConfiguration": {
+                        "disablePasswordAuthentication": "true",
+                        "ssh": {
+                            "publicKeys": [
+                                {
+                                    "path": "[variables('sshKeyPath')]",
+                                    "keyData": "[parameters('sshPublicKey')]"
+                                }
+                            ]
+                        }
+                    }
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "publisher": "[variables('osImagePublisher')]",
+                        "offer": "[variables('osImageOffer')]",
+                        "sku": "[variables('osImageSKU')]",
+                        "version": "latest"
+                    },
+                    "osDisk": {
+                        "name": "[concat(variables('vmNameNode'), copyIndex(),'-osdisk')]",
+                        "vhd": {
+                            "uri": "[concat('http://', variables('newStorageAccountName'), '.blob.core.windows.net/', variables('vhdBlobContainer'), '/node-', copyIndex(), '-osdisk.vhd')]"
+                        },
+                        "caching": "ReadWrite",
+                        "createOption": "FromImage"
+                    }
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces',concat(variables('vmNameNode'), copyindex(), '-nic'))]"
+                        }
+                    ]
+                }
+            },
+            "dependsOn": [
+                "[concat('Microsoft.Storage/storageAccounts/', variables('newStorageAccountName'))]",
+                "[concat('Microsoft.Network/networkInterfaces/', variables('vmNameNode'), copyIndex(), '-nic')]"
+            ]
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "name": "[concat(variables('vmNameMaster'), copyIndex(), '/DockerExtension')]",
+            "apiVersion": "2015-06-15",
+            "location": "[resourceGroup().location]",
+            "copy": {
+                "name": "extensionLoopMaster",
+                "count": "[variables('masterCount')]"
+            },
+            "properties": {
+                "publisher": "Microsoft.Azure.Extensions",
+                "type": "DockerExtension",
+                "typeHandlerVersion": "1.0",
+                "autoUpgradeMinorVersion": true,
+                "settings": {
+                    "compose": {
+                        "consul": {
+                            "image": "progrium/consul",
+                            "command": "[concat('-server -node master', copyIndex(), ' ', variables('consulServerArgs')[copyIndex()])]",
+                            "ports": [
+                                "8500:8500",
+                                "8300:8300",
+                                "8301:8301",
+                                "8301:8301/udp",
+                                "8302:8302",
+                                "8302:8302/udp",
+                                "8400:8400"
+                            ],
+                            "volumes": [
+                                "/data/consul:/data"
+                            ],
+                            "restart": "always"
+                        },
+                        "swarm": {
+                            "image": "swarm",
+                            "command": "[concat('manage --replication --advertise ', reference(concat(variables('vmNameMaster'), copyIndex(), '-nic')).ipConfigurations[0].properties.privateIPAddress, ':2375 --discovery-opt kv.path=docker/nodes consul://10.0.0.4:8500')]",
+                            "ports": [
+                                "2375:2375"
+                            ],
+                            "links": [
+                                "consul"
+                            ],
+                            "volumes": [
+                                "/etc/docker:/etc/docker"
+                            ],
+                            "restart": "always"
+                        }
+                    }
+                }
+            },
+            "dependsOn": [
+                "[concat('Microsoft.Compute/virtualMachines/', variables('vmNameMaster'), copyIndex())]"
+            ]
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "name": "[concat(variables('vmNameNode'), copyIndex(), '/DockerExtension')]",
+            "apiVersion": "2015-06-15",
+            "location": "[resourceGroup().location]",
+            "copy": {
+                "name": "extensionLoopNode",
+                "count": "[parameters('nodeCount')]"
+            },
+            "properties": {
+                "publisher": "Microsoft.Azure.Extensions",
+                "type": "DockerExtension",
+                "typeHandlerVersion": "1.0",
+                "autoUpgradeMinorVersion": true,
+                "settings": {
+                    "docker": {
+                        "port": "2375",
+                        "options": [
+                            "--cluster-store=consul://10.0.0.4:8500",
+                            "--cluster-advertise=eth0:2375"
+                        ]
+                    }
+                }
+            },
+            "dependsOn": [
+                "[concat('Microsoft.Compute/virtualMachines/', variables('vmNameNode'), copyIndex())]"
+            ]
+        }
+    ],
+    "outputs": {
+        "sshTunnelCmd": {
+            "type": "String",
+            "value": "[concat('ssh -L 2375:swarm-master-0:2375 -N ', variables('adminUsername'), '@', reference(variables('managementPublicIPAddrName')).dnsSettings.fqdn, ' -p 2200')]"
+        },
+        "dockerCmd": {
+            "type": "String",
+            "value": "docker -H tcp://localhost:2375 info"
+        },
+        "swarmNodesLoadBalancerAddress": {
+            "type": "String",
+            "value": "[reference(variables('nodesPublicIPAddrName')).dnsSettings.fqdn]"
+        },
+        "sshMaster0": {
+            "type": "String",
+            "value": "[concat('ssh ', variables('adminUsername'), '@', reference(variables('managementPublicIPAddrName')).dnsSettings.fqdn, ' -A -p 2200')]"
+        },
+        "sshMaster1": {
+            "type": "String",
+            "value": "[concat('ssh ', variables('adminUsername'), '@', reference(variables('managementPublicIPAddrName')).dnsSettings.fqdn, ' -A -p 2201')]"
+        },
+        "sshMaster2": {
+            "type": "String",
+            "value": "[concat('ssh ', variables('adminUsername'), '@', reference(variables('managementPublicIPAddrName')).dnsSettings.fqdn, ' -A -p 2202')]"
+        }
+    }
+}
