@@ -20,22 +20,13 @@ services:
     logstash:
         image: pblittle/docker-logstash
         ports:          
-            - "5044:5044"
             - "5043:5043"
         command: logstash -e LOGSTASH_CONFIG_URL=https://raw.githubusercontent.com/3shapeAS/Communicate.Configuration/staging/Elasticsearch-Logstash-Kibana/configuration/logstash.conf
         depends_on: 
             - es-client
         networks: 
-        - elk-network
-      
-
-networks:
-    elk-network:
-
-        networks: 
         - metrics-network
-      
-
+            
 networks:
   metrics-network:
     driver: overlay
