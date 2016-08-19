@@ -11,7 +11,7 @@ services:
         - elasticsearch-network
         environment:                                                                                                                                                                                                                                                                                        
         - reschedule=on-node-failure
-        elasticsearch_yml: | bootstrap.mlockall: true
+        elasticsearch_yml: | 'bootstrap.mlockall: true'
         labels:
         - 'com.docker.swarm.reschedule-policies=["on-node-failure"]'
 
@@ -27,7 +27,7 @@ services:
         - elasticsearch-network
         environment:
         - ES_HEAP_SIZE=4g
-        elasticsearch_yml: | bootstrap.mlockall: true
+        elasticsearch_yml: | 'bootstrap.mlockall: true'
         
 
     es-client:
@@ -43,7 +43,7 @@ services:
         networks:
         - elasticsearch-network
         environment:
-        elasticsearch_yml: | bootstrap.mlockall: true
+        elasticsearch_yml: | 'bootstrap.mlockall: true'
 
 networks:
   elasticsearch-network:
