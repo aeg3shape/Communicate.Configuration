@@ -19,8 +19,6 @@ services:
 
     logstash:
         image: pblittle/docker-logstash
-        ports:          
-            - "5043:5043"
         command: logstash -e LOGSTASH_CONFIG_URL=https://raw.githubusercontent.com/3shapeAS/Communicate.Configuration/staging/Elasticsearch-Logstash-Kibana/configuration/logstash.conf
         networks: 
         - metrics-network
