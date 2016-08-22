@@ -30,8 +30,6 @@ services:
 
     es-client:
         image: elasticsearch:2
-        ports: 
-         - "9200:9200"
         command: elasticsearch -Des.bootstrap.mlockall=true --discovery.zen.ping.multicast.enabled=false --discovery.zen.ping.unicast.hosts=es-master --discovery.zen.minimum_master_nodes=3 --node.master=false --node.data=false --cluster.name=production --node.name=es-client
         ulimits:
             memlock: -1
