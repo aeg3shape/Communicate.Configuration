@@ -25,7 +25,7 @@ services:
         networks:
         - elasticsearch-network
         environment:
-            - ES_HEAP_SIZE=4g
+            ES_HEAP_SIZE: '4g'
         
 
     es-client:
@@ -40,8 +40,6 @@ services:
             - es-master
         networks:
         - elasticsearch-network
-        environment:
-            bootstrap.mlockall: 'true'
 
 networks:
   elasticsearch-network:

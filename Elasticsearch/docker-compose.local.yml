@@ -1,4 +1,14 @@
 version: '2'
 
+
+services:
+    es-data:
+        environment:
+            ES_HEAP_SIZE:
+
+    es-client:
+        ports:
+        - "9000:9200"
+
 networks:
     elasticsearch-network:
