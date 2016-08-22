@@ -4,33 +4,44 @@ services:
     es-master:
         image: elasticsearch:2
         restart: always
-        command: elasticsearch --discovery.zen.ping.multicast.enabled=false --discovery.zen.ping.unicast.hosts=es-master --discovery.zen.minimum_master_nodes=3 --node.master=true --node.data=false --cluster.name=production --node.name=es-master --network.bind_host=0.0.0.0
+        command: elasticsearch -Des.bootstrap.mlockall=true --discovery.zen.ping.multicast.enabled=false --discovery.zen.ping.unicast.hosts=es-master --discovery.zen.minimum_master_nodes=3 --node.master=true --node.data=false --cluster.name=production --node.name=es-master --network.bind_host=0.0.0.0
+        ulimits:
+            memlock: -1
         networks:
         - elasticsearch-network
         environment:                                                                                                                                                                                                                                                                                        
-        - reschedule=on-node-failure
+            - reschedule=on-node-failure
         labels:
         - 'com.docker.swarm.reschedule-policies=["on-node-failure"]'
 
     es-data:
         image: elasticsearch:2
-        command: elasticsearch --discovery.zen.ping.multicast.enabled=false --discovery.zen.ping.unicast.hosts=es-master --discovery.zen.minimum_master_nodes=3 --node.master=false --node.data=true --cluster.name=production --node.name=es-data
+        command: elasticsearch -Des.bootstrap.mlockall=true --discovery.zen.ping.multicast.enabled=false --discovery.zen.ping.unicast.hosts=es-master --discovery.zen.minimum_master_nodes=3 --node.master=false --node.data=true --cluster.name=production --node.name=es-data
+        ulimits:
+            memlock: -1
         restart: always
         depends_on:
             - es-master
         networks:
         - elasticsearch-network
+        environment:
+            - ES_HEAP_SIZE=4g
+        
 
     es-client:
         image: elasticsearch:2
         ports: 
          - "9200:9200"
-        command: elasticsearch --discovery.zen.ping.multicast.enabled=false --discovery.zen.ping.unicast.hosts=es-master --discovery.zen.minimum_master_nodes=3 --node.master=false --node.data=false --cluster.name=production --node.name=es-client
+        command: elasticsearch -Des.bootstrap.mlockall=true --discovery.zen.ping.multicast.enabled=false --discovery.zen.ping.unicast.hosts=es-master --discovery.zen.minimum_master_nodes=3 --node.master=false --node.data=false --cluster.name=production --node.name=es-client
+        ulimits:
+            memlock: -1
         restart: always
         depends_on:
             - es-master
         networks:
         - elasticsearch-network
+        environment:
+            bootstrap.mlockall: 'true'
 
 networks:
   elasticsearch-network:
