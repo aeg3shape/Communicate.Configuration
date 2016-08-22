@@ -6,12 +6,12 @@ services:
         command: elasticsearch --discovery.zen.ping.unicast.hosts=es-master --node.master=true --node.data=false --cluster.name=local --node.name=es-master 
 
     es-data:
-        command: elasticsearch --discovery.zen.ping.unicast.hosts=es-master --node.master=false --node.data=true --cluster.name=local --node.name=es-master
+        command: elasticsearch --discovery.zen.ping.unicast.hosts=es-master --node.master=false --node.data=true --cluster.name=local --node.name=es-data
         environment:
             ES_HEAP_SIZE:
 
     es-client:
-        command: elasticsearch --discovery.zen.ping.unicast.hosts=es-master --node.master=false --node.data=false --cluster.name=local --node.name=es-master
+        command: elasticsearch --discovery.zen.ping.unicast.hosts=es-master --node.master=false --node.data=false --cluster.name=local --node.name=es-client
         ports: 
         - "9000:9200"
          
